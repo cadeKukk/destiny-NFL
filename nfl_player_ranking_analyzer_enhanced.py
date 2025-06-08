@@ -23,15 +23,13 @@ class NFLPlayerRankingAnalyzerEnhanced:
     def __init__(self):
         self.setup_selenium()
         
-        # UPDATED URLs as provided by user
+        # UPDATED URLs - REMOVED Lance Zierlein and Chad Reuter as requested
         self.author_urls = {
             'Bucky Brooks': 'https://www.nfl.com/news/bucky-brooks-2025-nfl-mock-draft-4-0-steelers-land-shedeur-sanders-cowboys-broncos-select-rbs',
             'Daniel Jeremiah': 'https://www.nfl.com/news/daniel-jeremiah-2025-nfl-mock-draft-4-0',
-            'Lance Zierlein': 'https://www.nfl.com/news/lance-zierlein-2025-nfl-mock-draft-4-0-colts-trade-up-for-colston-loveland-saints-go-get-jaxson-dart',
             'Charles Davis': 'https://www.nfl.com/news/charles-davis-2025-nfl-mock-draft-3-0-cam-ward-only-qb-in-round-1-eagles-pick-te-mason-taylor',
             'Eric Edholm': 'https://www.nfl.com/news/eric-edholm-2025-nfl-mock-draft-3-0-four-first-round-quarterbacks-jaguars-take-rb-ashton-jeanty',
             'Dan Parr': 'https://www.nfl.com/news/dan-parr-2025-nfl-mock-draft-2-0-offensive-linemen-dominate-top-10-bears-grab-tight-end-tyler-warren',
-            'Chad Reuter': 'https://www.nfl.com/news/seven-round-2025-nfl-mock-draft-round-one',
             'Gennaro Filice': 'https://www.nfl.com/news/gennaro-filice-2025-nfl-mock-draft-2-0-rb-ashton-jeanty-goes-top-5-cowboys-jump-for-jalon-walker',
             'Marc Ross': 'https://www.nfl.com/news/marc-ross-2025-nfl-mock-draft-1-0-three-qbs-selected-in-top-10-jets-snag-rb-ashton-jeanty'
         }
@@ -79,7 +77,7 @@ class NFLPlayerRankingAnalyzerEnhanced:
             if pick_elements:
                 print(f"   📋 Found {len(pick_elements)} draft picks for {author}")
                 
-                for i, pick_element in enumerate(pick_elements[:20], 1):  # Top 20 picks
+                for i, pick_element in enumerate(pick_elements[:32], 1):  # Top 32 picks
                     try:
                         # Extract player name from the pick element
                         player_name = self.extract_player_name_comprehensive(pick_element, i)
@@ -126,8 +124,8 @@ class NFLPlayerRankingAnalyzerEnhanced:
         for selector in selectors:
             try:
                 elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                if elements and len(elements) >= 10:  # Should have at least 10 picks
-                    pick_elements = elements
+                if elements:
+                    pick_elements = elements[:32]  # Top 32 picks
                     print(f"   ✓ Using selector: {selector}")
                     break
             except:
@@ -359,7 +357,7 @@ class NFLPlayerRankingAnalyzerEnhanced:
         title_run.font.color.rgb = RGBColor(0, 53, 148)
         
         # Subtitle
-        subtitle = doc.add_paragraph(f'Players Ranked by Selection Frequency Across 9 NFL.com Experts - {datetime.now().strftime("%B %d, %Y")}')
+        subtitle = doc.add_paragraph(f'Players Ranked by Selection Frequency Across 7 NFL.com Experts - {datetime.now().strftime("%B %d, %Y")}')
         subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
         subtitle_run = subtitle.runs[0]
         subtitle_run.font.size = Pt(12)
@@ -367,7 +365,7 @@ class NFLPlayerRankingAnalyzerEnhanced:
         
         # Summary stats
         summary = doc.add_paragraph()
-        summary_run = summary.add_run(f"📊 Analysis Summary: {len(ranked_players)} unique players • {len(self.all_players)} total selections • 9 expert analysts")
+        summary_run = summary.add_run(f"📊 Analysis Summary: {len(ranked_players)} unique players • {len(self.all_players)} total selections • 7 expert analysts")
         summary_run.font.size = Pt(11)
         summary_run.font.color.rgb = RGBColor(107, 114, 128)
         summary.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -429,7 +427,7 @@ class NFLPlayerRankingAnalyzerEnhanced:
 
 def main():
     print("=== NFL Player Ranking Analyzer Enhanced ===")
-    print("🔍 Analyzing player selections across all 9 NFL.com experts")
+    print("🔍 Analyzing player selections across all 7 NFL.com experts")
     print("📊 Enhanced player name extraction and ranking")
     print("=" * 60)
     
@@ -457,7 +455,7 @@ def main():
         print(f"\n📈 Analysis Summary:")
         print(f"   • {len(ranked_players)} unique players identified")
         print(f"   • {len(analyzer.all_players)} total selections analyzed")
-        print(f"   • 9 NFL.com expert mock drafts processed")
+        print(f"   • 7 NFL.com expert mock drafts processed")
         print(f"   • Enhanced name extraction with pattern matching")
         
     finally:

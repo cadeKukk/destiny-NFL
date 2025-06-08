@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-NFL Screenshot Complete - All Authors, 20 Picks, Optimized Formatting
-Takes screenshots of all NFL.com mock draft pages with improved spacing and coverage
+NFL Screenshot Complete - All Authors, 32 Picks, With Descriptions
+Takes screenshots of all NFL.com mock draft pages with pick reasoning
 """
 
 import os
@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from docx import Document
 from docx.shared import Inches, RGBColor, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -20,20 +20,19 @@ class NFLScreenshotComplete:
     def __init__(self):
         self.setup_selenium()
         
-        # UPDATED URLs as provided by user
+        # UPDATED URLs - REMOVED Lance Zierlein and Chad Reuter as requested
         self.author_urls = {
             'Bucky Brooks': 'https://www.nfl.com/news/bucky-brooks-2025-nfl-mock-draft-4-0-steelers-land-shedeur-sanders-cowboys-broncos-select-rbs',
             'Daniel Jeremiah': 'https://www.nfl.com/news/daniel-jeremiah-2025-nfl-mock-draft-4-0',
-            'Lance Zierlein': 'https://www.nfl.com/news/lance-zierlein-2025-nfl-mock-draft-4-0-colts-trade-up-for-colston-loveland-saints-go-get-jaxson-dart',
             'Charles Davis': 'https://www.nfl.com/news/charles-davis-2025-nfl-mock-draft-3-0-cam-ward-only-qb-in-round-1-eagles-pick-te-mason-taylor',
             'Eric Edholm': 'https://www.nfl.com/news/eric-edholm-2025-nfl-mock-draft-3-0-four-first-round-quarterbacks-jaguars-take-rb-ashton-jeanty',
             'Dan Parr': 'https://www.nfl.com/news/dan-parr-2025-nfl-mock-draft-2-0-offensive-linemen-dominate-top-10-bears-grab-tight-end-tyler-warren',
-            'Chad Reuter': 'https://www.nfl.com/news/seven-round-2025-nfl-mock-draft-round-one',
             'Gennaro Filice': 'https://www.nfl.com/news/gennaro-filice-2025-nfl-mock-draft-2-0-rb-ashton-jeanty-goes-top-5-cowboys-jump-for-jalon-walker',
             'Marc Ross': 'https://www.nfl.com/news/marc-ross-2025-nfl-mock-draft-1-0-three-qbs-selected-in-top-10-jets-snag-rb-ashton-jeanty'
         }
         
         os.makedirs('processed/complete_screenshots', exist_ok=True)
+        self.pick_descriptions = {}  # Store descriptions for each pick
 
     def setup_selenium(self):
         """Setup Selenium WebDriver for taking screenshots"""
@@ -65,7 +64,7 @@ class NFLScreenshotComplete:
             
             # Navigate to the page
             self.driver.get(url)
-            time.sleep(12)  # Extended wait for page to fully load
+            time.sleep(6)  # Reduced wait for page to fully load
             
             # Remove overlays
             self.remove_overlays()
@@ -76,7 +75,7 @@ class NFLScreenshotComplete:
             if header_screenshot:
                 screenshots.append(header_screenshot)
             
-            # Get individual draft picks (UP TO 20 PICKS)
+            # Get individual draft picks (UP TO 32 PICKS)
             pick_screenshots = self.screenshot_individual_picks(author)
             screenshots.extend(pick_screenshots)
             
@@ -179,22 +178,14 @@ class NFLScreenshotComplete:
         return None
 
     def screenshot_individual_picks(self, author):
-        """Screenshot individual NFL draft picks - UP TO 20 PICKS"""
+        """Screenshot individual NFL draft picks - UP TO 32 PICKS"""
         screenshots = []
         
         try:
-            # Wait for content to load
-            WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'body'))
-            )
-            
             # Look for NFL.com draft pick elements
             pick_selectors = [
                 '.nfl-o-ranked-item.nfl-o-ranked-item--side-by-side',
-                '.nfl-o-ranked-item',
-                '[class*="ranked-item"]',
-                '.mock-draft-pick',
-                '.draft-pick'
+                '.nfl-o-ranked-item'
             ]
             
             pick_elements = []
@@ -202,36 +193,270 @@ class NFLScreenshotComplete:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
                     if elements:
-                        pick_elements = elements[:20]  # UP TO 20 PICKS
+                        pick_elements = elements[:32]  # UP TO 32 PICKS
                         print(f"   📋 Found {len(pick_elements)} draft picks for {author} using: {selector}")
                         break
                 except:
                     continue
             
             if pick_elements:
+                # Initialize author in pick_descriptions if not exists
+                if author not in self.pick_descriptions:
+                    self.pick_descriptions[author] = {}
+                
                 for i, pick_element in enumerate(pick_elements, 1):
                     try:
-                        # Scroll to the pick
-                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", pick_element)
-                        time.sleep(2)
+                        print(f"   🔍 Processing Pick {i}...")
                         
-                        # Take direct element screenshot
-                        screenshot_path = f"processed/complete_screenshots/{author}_pick_{i:02d}.png"
-                        pick_element.screenshot(screenshot_path)
+                        # Scroll element into view for better capture
+                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", pick_element)
+                        time.sleep(0.8)  # Reduced wait for scroll to complete
                         
-                        screenshots.append(screenshot_path)
+                        # Extract description/reasoning for this pick FIRST
+                        description = self.extract_pick_description_enhanced(pick_element, i, author)
+                        self.pick_descriptions[author][i] = description
+                        print(f"      📝 Description: {description[:100]}...")
+                        
+                        # Take screenshot of the pick element with better positioning
+                        filename = f'{author}_pick_{i}.png'
+                        filepath = os.path.join('processed/complete_screenshots', filename)
+                        
+                        # Ensure element is fully visible
+                        self.driver.execute_script("arguments[0].style.border='2px solid red';", pick_element)
+                        time.sleep(0.5)
+                        
+                        # Take the screenshot
+                        pick_element.screenshot(filepath)
+                        
+                        # Remove the border
+                        self.driver.execute_script("arguments[0].style.border='';", pick_element)
+                        
+                        screenshots.append(filepath)
                         print(f"   ✓ Pick {i} screenshot captured")
+                        
+                        time.sleep(0.4)  # Reduced pause between screenshots
                         
                     except Exception as e:
                         print(f"   ⚠️ Error capturing pick {i}: {e}")
+                        # Store a placeholder description even if screenshot fails
+                        if author not in self.pick_descriptions:
+                            self.pick_descriptions[author] = {}
+                        self.pick_descriptions[author][i] = f"Analysis for pick #{i} by {author}."
                         continue
             else:
-                print(f"   ⚠️ No draft pick elements found for {author}")
-                
+                # Fallback: try to capture a full page section
+                print(f"   ⚠️ Using fallback method for {author}")
+                try:
+                    filename = f'{author}_section.png'
+                    filepath = os.path.join('processed/complete_screenshots', filename)
+                    self.driver.save_screenshot(filepath)
+                    screenshots.append(filepath)
+                except:
+                    pass
+                    
         except Exception as e:
-            print(f"   ⚠️ Error finding draft picks for {author}: {e}")
+            print(f"   ⚠️ Error in screenshot_individual_picks: {e}")
             
         return screenshots
+
+    def _get_filtered_analysis_paragraphs(self):
+        """Get filtered analysis paragraphs for sequential mapping"""
+        try:
+            # Get all paragraph elements
+            all_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, 'p')
+            
+            # Get first and last pick locations for filtering boundaries
+            pick_elements = self.driver.find_elements(By.CSS_SELECTOR, '.nfl-o-ranked-item.nfl-o-ranked-item--side-by-side')
+            if not pick_elements:
+                return []
+            
+            first_pick_y = pick_elements[0].location['y']
+            last_pick_y = pick_elements[-1].location['y']
+            
+            analysis_paragraphs = []
+            for para in all_paragraphs:
+                try:
+                    text = para.get_attribute('textContent').strip()
+                    location = para.location['y']
+                    
+                    # Filter criteria based on debug findings
+                    if (text and len(text) > 50 and len(text) < 1000 and
+                        location > first_pick_y and  # After first pick
+                        location < last_pick_y + 2000 and  # Before way after last pick
+                        any(keyword in text.lower() for keyword in ['quarterback', 'player', 'draft', 'team', 'offense', 'defense', 'potential', 'needs', 'season', 'franchise']) and
+                        not text.startswith('Pick') and
+                        '©' not in text and
+                        'nfl.com' not in text.lower() and
+                        'cookie' not in text.lower() and
+                        'privacy' not in text.lower() and
+                        # Filter out intro/outro text
+                        'finally the week' not in text.lower() and
+                        'trades that are struck' not in text.lower() and
+                        'in his final mock' not in text.lower() and
+                        'with round 1' not in text.lower()):
+                        
+                        analysis_paragraphs.append((location, text))
+                except:
+                    continue
+            
+            # Sort by Y position and return just the text
+            analysis_paragraphs.sort(key=lambda x: x[0])
+            return [text for location, text in analysis_paragraphs]
+            
+        except Exception as e:
+            print(f"      ⚠️ Error getting analysis paragraphs: {e}")
+            return []
+
+    def extract_pick_description_enhanced(self, pick_element, pick_number, author):
+        """Enhanced description extraction using improved spatial positioning and context analysis"""
+        try:
+            print(f"      🔍 Extracting description for pick {pick_number}...")
+            
+            # Get player info from the pick element
+            pick_text = pick_element.get_attribute('textContent')
+            player_name = None
+            team_name = None
+            
+            # Extract player and team names from pick element
+            lines = [line.strip() for line in pick_text.split('\n') if line.strip()]
+            for line in lines:
+                # Check for team names
+                if any(team in line.lower() for team in ['titans', 'browns', 'giants', 'patriots', 'raiders', 'jaguars', 'jets', 'panthers', 'saints', 'lions', 'cowboys', 'dolphins', 'colts', 'falcons', 'cardinals', 'bengals', 'vikings', 'buccaneers', 'broncos', 'chargers', 'steelers', 'packers', 'texans', 'rams', 'eagles', 'bills', 'chiefs', 'seahawks', 'commanders']):
+                    team_name = line
+                # Look for player name (typically 2 words, starts with capital)
+                elif len(line.split()) == 2 and line[0].isupper() and 'pick' not in line.lower():
+                    player_name = line
+                    break
+            
+            print(f"         Team: {team_name}, Player: {player_name}")
+            
+            # Find analysis text that comes immediately after this pick element
+            pick_location = pick_element.location['y']
+            
+            # Get all paragraph elements and find those that come after this pick
+            all_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, 'p')
+            
+            analysis_candidates = []
+            for para in all_paragraphs:
+                try:
+                    para_location = para.location['y']
+                    para_text = para.get_attribute('textContent').strip()
+                    
+                    # Only consider paragraphs that come after this pick with analysis content
+                    if (para_location > pick_location and 
+                        len(para_text) > 50 and len(para_text) < 1000 and
+                        any(keyword in para_text.lower() for keyword in ['quarterback', 'player', 'draft', 'team', 'offense', 'defense', 'potential', 'needs', 'season', 'franchise', 'protection', 'elite']) and
+                        not para_text.startswith('Pick') and
+                        '©' not in para_text and
+                        'nfl.com' not in para_text.lower() and
+                        'cookie' not in para_text.lower() and
+                        'privacy' not in para_text.lower()):
+                        
+                        analysis_candidates.append((para_location, para_text))
+                except:
+                    continue
+            
+            # Sort by Y position to get the closest analysis text
+            analysis_candidates.sort(key=lambda x: x[0])
+            
+            print(f"         Found {len(analysis_candidates)} analysis candidates after pick")
+            
+            # Strategy A: Look for analysis that mentions the player or team specifically
+            if player_name or team_name:
+                for location, text in analysis_candidates[:3]:  # Check first 3 candidates
+                    text_lower = text.lower()
+                    
+                    # Check if mentions player name
+                    if player_name and player_name.lower() in text_lower:
+                        description = text.replace('\n', ' ').replace('\t', ' ')
+                        description = ' '.join(description.split())
+                        if len(description) > 400:
+                            description = description[:400] + '...'
+                        print(f"      ✓ Found player-specific analysis: {description[:50]}...")
+                        return description
+                    
+                    # Check if mentions team characteristics or context
+                    if team_name:
+                        team_keywords = {
+                            'giants': ['giants', 'new york'],
+                            'titans': ['titans', 'tennessee'],
+                            'browns': ['browns', 'cleveland'], 
+                            'patriots': ['patriots', 'new england', 'drake maye'],
+                            'jaguars': ['jaguars', 'jacksonville', 'trevor lawrence'],
+                            'raiders': ['raiders', 'las vegas'],
+                            'jets': ['jets', 'new york jets', 'justin fields'],
+                            'cowboys': ['cowboys', 'dallas'],
+                            'saints': ['saints', 'new orleans'],
+                            'bears': ['bears', 'chicago'],
+                            'panthers': ['panthers', 'carolina'],
+                            'dolphins': ['dolphins', 'miami', 'jalen ramsey'],
+                            'colts': ['colts', 'indianapolis'],
+                            'falcons': ['falcons', 'atlanta'],
+                            'cardinals': ['cardinals', 'arizona'],
+                            'bengals': ['bengals', 'cincinnati'],
+                            'vikings': ['vikings', 'minnesota'],
+                            'buccaneers': ['buccaneers', 'tampa bay', 'bucs'],
+                            'broncos': ['broncos', 'denver', 'sean payton'],
+                            'chargers': ['chargers', 'los angeles chargers'],
+                            'steelers': ['steelers', 'pittsburgh'],
+                            'packers': ['packers', 'green bay'],
+                            'texans': ['texans', 'houston'],
+                            'rams': ['rams', 'los angeles rams'],
+                            'eagles': ['eagles', 'philadelphia'],
+                            'bills': ['bills', 'buffalo'],
+                            'chiefs': ['chiefs', 'kansas city'],
+                            'seahawks': ['seahawks', 'seattle'],
+                            'commanders': ['commanders', 'washington']
+                        }
+                        
+                        team_lower = team_name.lower()
+                        for team_key, keywords in team_keywords.items():
+                            if team_key in team_lower:
+                                if any(keyword in text_lower for keyword in keywords):
+                                    description = text.replace('\n', ' ').replace('\t', ' ')
+                                    description = ' '.join(description.split())
+                                    if len(description) > 400:
+                                        description = description[:400] + '...'
+                                    print(f"      ✓ Found team-specific analysis: {description[:50]}...")
+                                    return description
+            
+            # Strategy B: Use the closest available analysis text (not indexed by pick number)
+            if analysis_candidates:
+                # Simply use the first (closest) available analysis text
+                # This matches what the debug showed as the correct approach
+                location, text = analysis_candidates[0]
+                description = text.replace('\n', ' ').replace('\t', ' ')
+                description = ' '.join(description.split())
+                if len(description) > 400:
+                    description = description[:400] + '...'
+                print(f"      ✓ Found closest positional analysis: {description[:50]}...")
+                return description
+            
+            # Strategy 2: Fallback to element-based extraction
+            full_text = pick_element.get_attribute('textContent')
+            
+            if not full_text:
+                print(f"      ⚠️ No text content found, using placeholder")
+                return f"Draft analysis for pick #{pick_number} by {author}."
+            
+            # Clean and split the text
+            lines = [line.strip() for line in full_text.split('\n') if line.strip()]
+            
+            # Look for any substantial text lines
+            substantial_lines = [line for line in lines if len(line) > 30 and not line.isupper() and 'Pick' not in line]
+            if substantial_lines:
+                fallback = substantial_lines[0]
+                if len(fallback) > 300:
+                    fallback = fallback[:300] + '...'
+                print(f"      ⚠️ Using fallback description: {fallback[:50]}...")
+                return fallback
+            else:
+                print(f"      ⚠️ No description found, using placeholder")
+                return f"Draft analysis for pick #{pick_number} by {author}."
+                
+        except Exception as e:
+            print(f"      ⚠️ Error extracting description: {e}")
+            return f"Analysis for pick #{pick_number} not available."
 
     def screenshot_page_sections(self, author):
         """Take page section screenshots as backup"""
@@ -255,7 +480,7 @@ class NFLScreenshotComplete:
                 
                 # Scroll to position
                 self.driver.execute_script(f"window.scrollTo(0, {scroll_position});")
-                time.sleep(4)  # Wait for content to load
+                time.sleep(2)  # Reduced wait for content to load
                 
                 # Take screenshot
                 screenshot_path = f"processed/complete_screenshots/{author}_section_{i+1:02d}.png"
@@ -284,13 +509,13 @@ class NFLScreenshotComplete:
             print(f"   ⚠️ Could not take fallback screenshot for {author}: {e}")
             return None
 
-    def create_screenshot_document(self, all_screenshots):
-        """Create Word document with optimized spacing and formatting"""
+    def create_word_document(self, all_screenshots):
+        """Create a Word document with all screenshots and descriptions"""
         print("📄 Creating optimized Word document with all authors...")
         
         doc = Document()
         
-        # Set tight margins for more content
+        # Set narrow margins for space efficiency
         sections = doc.sections
         for section in sections:
             section.top_margin = Inches(0.4)
@@ -298,90 +523,129 @@ class NFLScreenshotComplete:
             section.left_margin = Inches(0.4)
             section.right_margin = Inches(0.4)
         
-        # Title with reduced spacing
-        title = doc.add_heading('NFL 2025 Mock Draft Collection', 0)
+        # Title
+        title = doc.add_heading('NFL.com 2025 Mock Draft Screenshots', 0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_run = title.runs[0]
-        title_run.font.size = Pt(22)  # Slightly smaller
+        title_run.font.size = Pt(18)
         title_run.font.color.rgb = RGBColor(0, 53, 148)
-        title.space_after = Pt(6)  # Reduce space after title
         
-        # Subtitle with minimal spacing
-        subtitle = doc.add_paragraph(f'Complete NFL.com Mock Draft Screenshots - {datetime.now().strftime("%B %d, %Y")}')
+        # Subtitle with date and summary
+        subtitle = doc.add_paragraph(f'Complete NFL.com Mock Drafts - {datetime.now().strftime("%B %d, %Y")}')
         subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
         subtitle_run = subtitle.runs[0]
         subtitle_run.font.size = Pt(10)
         subtitle_run.font.color.rgb = RGBColor(107, 114, 128)
-        subtitle.space_after = Pt(8)
         
-        # Group screenshots by author
-        authors_screenshots = {}
-        for screenshot_data in all_screenshots:
-            author = screenshot_data['author']
-            if author not in authors_screenshots:
-                authors_screenshots[author] = []
-            authors_screenshots[author].extend(screenshot_data['screenshots'])
+        # Summary
+        total_screenshots = sum(len(screenshots) for screenshots in all_screenshots.values())
+        summary = doc.add_paragraph()
+        summary_run = summary.add_run(f"📊 {len(all_screenshots)} Authors • {total_screenshots} Screenshots • Top 32 Picks Each • Expert Analysis Included")
+        summary_run.font.size = Pt(9)
+        summary_run.font.color.rgb = RGBColor(107, 114, 128)
+        summary.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        summary.space_after = Pt(8)
         
-        # Add each author's screenshots with optimized spacing
-        for i, (author, screenshots) in enumerate(authors_screenshots.items()):
-            
-            # Author section with minimal spacing
-            if i > 0:  # Only add page break after first author
-                doc.add_page_break()
-            
-            # Author header with reduced spacing
-            author_para = doc.add_paragraph()
-            author_run = author_para.add_run(f"🏈 {author}")
-            author_run.font.size = Pt(18)  # Smaller header
-            author_run.font.bold = True
-            author_run.font.color.rgb = RGBColor(0, 53, 148)
-            author_para.space_after = Pt(4)  # Minimal spacing
-            
-            # Count actual screenshots vs text entries
-            actual_screenshots = [s for s in screenshots if isinstance(s, str) and s.endswith('.png')]
-            
-            # Add brief description with minimal spacing
-            if actual_screenshots:
-                desc_para = doc.add_paragraph(f"📸 {len(actual_screenshots)} screenshots captured from NFL.com")
-            else:
-                desc_para = doc.add_paragraph(f"⚠️ Unable to capture screenshots for this author")
-            
-            desc_run = desc_para.runs[0]
-            desc_run.font.size = Pt(9)
-            desc_run.font.color.rgb = RGBColor(107, 114, 128)
-            desc_para.space_after = Pt(4)
-            
-            # Add each screenshot with minimal spacing
-            for screenshot_path in screenshots:
-                try:
-                    if isinstance(screenshot_path, str) and screenshot_path.endswith('.png') and os.path.exists(screenshot_path):
-                        # Add screenshot with reduced width for tighter layout
-                        doc.add_picture(screenshot_path, width=Inches(7.0))  # Slightly smaller
+        # Add screenshots for each author
+        for author, screenshots in all_screenshots.items():
+            if screenshots:
+                print(f"   📝 Adding {author} to document...")
+                
+                # Author header
+                author_header = doc.add_heading(f'{author} - 2025 Mock Draft', level=1)
+                author_header_run = author_header.runs[0]
+                author_header_run.font.size = Pt(16)
+                author_header_run.font.color.rgb = RGBColor(0, 53, 148)
+                author_header.space_before = Pt(6)
+                author_header.space_after = Pt(4)
+                
+                # Debug: Print available descriptions for this author
+                if author in self.pick_descriptions:
+                    print(f"      📝 Found {len(self.pick_descriptions[author])} descriptions for {author}")
+                else:
+                    print(f"      ⚠️ No descriptions found for {author}")
+                
+                # Add each screenshot with description
+                for i, screenshot in enumerate(screenshots):
+                    try:
+                        # Skip header screenshots for pick processing
+                        if 'header' in screenshot:
+                            # Add header screenshot
+                            if os.path.exists(screenshot):
+                                img_paragraph = doc.add_paragraph()
+                                img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                try:
+                                    img_run = img_paragraph.runs[0] if img_paragraph.runs else img_paragraph.add_run()
+                                    img_run.add_picture(screenshot, width=Inches(6.5))
+                                    img_paragraph.space_after = Pt(8)
+                                except:
+                                    pass
+                            continue
                         
-                        # Minimal spacing around images
-                        last_paragraph = doc.paragraphs[-1]
-                        last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        last_paragraph.space_before = Pt(3)  # Minimal spacing
-                        last_paragraph.space_after = Pt(3)   # Minimal spacing
+                        # Process pick screenshots
+                        if 'pick_' in screenshot:
+                            # Extract pick number from filename more reliably
+                            try:
+                                # Extract from filename like "Author_pick_5.png"
+                                filename = os.path.basename(screenshot)
+                                pick_part = filename.split('pick_')[-1]
+                                pick_num = int(pick_part.split('.')[0])
+                            except:
+                                # Fallback to position in list
+                                pick_num = i
+                            
+                            print(f"      🔍 Processing pick #{pick_num} screenshot...")
+                            
+                            # Add screenshot (removed Pick #X header as requested)
+                            if os.path.exists(screenshot):
+                                img_paragraph = doc.add_paragraph()
+                                img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                
+                                try:
+                                    img_run = img_paragraph.runs[0] if img_paragraph.runs else img_paragraph.add_run()
+                                    img_run.add_picture(screenshot, width=Inches(6.5))
+                                except:
+                                    # Fallback with smaller width if image is too large
+                                    try:
+                                        img_run = img_paragraph.runs[0] if img_paragraph.runs else img_paragraph.add_run()
+                                        img_run.add_picture(screenshot, width=Inches(5.5))
+                                    except Exception as img_error:
+                                        print(f"         ⚠️ Could not add image: {img_error}")
+                                        continue
+                                
+                                img_paragraph.space_after = Pt(4)
+                                
+                                # Add description for this pick
+                                description = None
+                                if author in self.pick_descriptions and pick_num in self.pick_descriptions[author]:
+                                    description = self.pick_descriptions[author][pick_num]
+                                    print(f"         ✓ Adding description: {description[:50]}...")
+                                else:
+                                    description = f"Analysis for pick #{pick_num} by {author}."
+                                    print(f"         ⚠️ No description found, using placeholder")
+                                
+                                # Description paragraph
+                                desc_paragraph = doc.add_paragraph()
+                                desc_run = desc_paragraph.add_run(f"📝 Analysis: {description}")
+                                desc_run.font.size = Pt(9)
+                                desc_run.font.color.rgb = RGBColor(74, 85, 104)
+                                desc_run.italic = True
+                                desc_paragraph.space_after = Pt(8)
                         
-                    elif isinstance(screenshot_path, str) and not screenshot_path.endswith('.png'):
-                        # Handle text entries (error messages)
-                        error_para = doc.add_paragraph(f"⚠️ {screenshot_path}")
-                        error_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        error_run = error_para.runs[0]
-                        error_run.font.size = Pt(10)
-                        error_run.font.color.rgb = RGBColor(200, 100, 100)
-                        error_para.space_after = Pt(6)
-                        
-                except Exception as e:
-                    print(f"⚠️ Could not add screenshot {screenshot_path}: {e}")
+                    except Exception as e:
+                        print(f"   ⚠️ Error adding screenshot {screenshot}: {e}")
+                        continue
         
         # Save document
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = f'processed/NFL_COMPLETE_ALL_AUTHORS_{timestamp}.docx'
         doc.save(output_path)
         
-        print(f"✓ Complete document saved: {output_path}")
+        # Debug: Print summary of descriptions collected
+        print(f"\n📊 Description Summary:")
+        for author, descriptions in self.pick_descriptions.items():
+            print(f"   {author}: {len(descriptions)} descriptions")
+        
         return output_path
 
     def cleanup(self):
@@ -389,12 +653,14 @@ class NFLScreenshotComplete:
         if self.driver:
             self.driver.quit()
 
+
+
 def main():
     print("=== NFL Complete Screenshot Creator ===")
-    print("📸 ALL 9 AUTHORS with up to 20 picks each")
-    print("🎯 Optimized formatting with reduced spacing")
+    print("📸 ALL 7 AUTHORS with up to 32 picks each")
+    print("🎯 Expert analysis included under each pick")
     print("✅ Every author guaranteed to appear in document")
-    print("=" * 55)
+    print("=======================================================")
     
     creator = NFLScreenshotComplete()
     
@@ -403,30 +669,28 @@ def main():
         return
     
     try:
-        all_screenshots = []
+        all_screenshots = {}
         
         # Process ALL authors
         for author, url in creator.author_urls.items():
             screenshots = creator.screenshot_webpage_content(url, author)
             
-            all_screenshots.append({
-                'author': author,
-                'screenshots': screenshots
-            })
+            all_screenshots[author] = screenshots
         
         # Create Word document with all authors
-        output_path = creator.create_screenshot_document(all_screenshots)
+        output_path = creator.create_word_document(all_screenshots)
         
         print(f"\n🎉 SUCCESS! Complete NFL.com screenshots captured!")
-        print("=" * 55)
+        print("=======================================================")
         print(f"📁 Document: {output_path}")
         print(f"📸 Screenshots: processed/complete_screenshots/")
         
-        total_screenshots = sum(len([s for s in author_data['screenshots'] if isinstance(s, str) and s.endswith('.png')]) for author_data in all_screenshots)
+        total_screenshots = sum(len([s for s in author_data if isinstance(s, str) and s.endswith('.png')]) for author_data in all_screenshots.values())
         print(f"\n📊 Summary:")
         print(f"   • {len(creator.author_urls)} authors processed (ALL)")
         print(f"   • {total_screenshots} total screenshots captured")
-        print(f"   • Up to 20 picks per author")
+        print(f"   • Up to 32 picks per author")
+        print(f"   • Expert analysis included under each pick")
         print(f"   • Optimized spacing and formatting")
         print(f"   • Every author appears in document")
         print(f"   • Ready for viewing in Word")

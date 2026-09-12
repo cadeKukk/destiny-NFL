@@ -2,6 +2,14 @@
 
 This program scrapes NFL mock draft data from NFL.com, processes it according to specified authors, and generates a Word document with the extracted data.
 
+## Saved output
+
+![First saved Bucky Brooks draft pick capture](processed/complete_screenshots/Bucky%20Brooks_pick_1.png)
+
+This image is an existing capture under `processed/complete_screenshots/`. It shows the source material collected for the 2025 mock-draft documents, not current draft predictions. NFL.com owns the captured article content and imagery.
+
+[Download a completed Word document](processed/NFL_COMPLETE_20250608_170704.docx) to inspect the June 8, 2025 output without rerunning the scraper. The [saved source page](ref/Bucky%20Brooks%202025%20NFL%20mock%20draft%204.0_%20Steelers%20land%20Shedeur%20Sanders%3B%20Cowboys%2C%20Broncos%20select%20RBs.html) is also included for comparison.
+
 ## Features
 
 - Scrapes mock draft data from NFL.com
@@ -69,4 +77,4 @@ You can modify the program by:
 - The program includes respectful delays between requests
 - It handles various HTML structures and patterns
 - Error handling is included for network issues
-- The scraper is designed to be robust and adaptive to different page layouts 
+- The scraper is designed to be robust and adaptive to different page layouts

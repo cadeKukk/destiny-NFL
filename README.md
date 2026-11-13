@@ -48,7 +48,7 @@ Starting from Bucky Brooks' mock draft 3.0 (the URL is in `main()`), it:
 3. keeps the drafts whose author matches the `target_authors` list in `NFLMockDraftScraper.__init__`: Charles Davis, Chad Reuter, Bucky Brooks, SI Contributors, Mike Band, Lance Zierlien (spelled that way in the code), Gennaro Filice, Eric Edholm, Daniel Jeremiah, Dan Parr and Cynthia Frelund. A draft also matches if any single word of a listed name appears in its author line.
 4. writes `processed/NFL_Mock_Drafts_2025_YYYYMMDD_HHMMSS.docx`: a title page, a list of the drafts, then each draft's title, date, URL and a table of pick, team, player, position and school.
 
-`extract_draft_picks()` looks for picks written as numbered paragraphs (`1. Team - Player, Position, School`) or as HTML tables. NFL.com shows picks as cards instead, so in a run on November 13, 2026 the scraper found the nine analysts' articles but every draft came out as "No draft picks found or extracted." [PR #1](https://github.com/cadeKukk/destiny-NFL/pull/1) adds a parser for the cards.
+`extract_draft_picks()` first reads NFL.com's pick cards: the current layout (a "Pick N" box with links to the team and the prospect) and the June 2025 layout saved in `ref/` (`.nfl-o-ranked-item` blocks). If neither is on the page it falls back to numbered paragraphs (`1. Team - Player, Position, School`) and HTML tables. In a run on November 13, 2026 it found ten mock draft articles, kept nine, and filled each table with 32 picks.
 
 `run_scraper.py` runs the same scraper with more progress output and, if it throws, writes a fallback document with sample data. `test_scraper.py` runs it once and prints the pick count per draft; it makes the same network requests and isn't a unit test.
 

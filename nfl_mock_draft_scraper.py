@@ -73,13 +73,15 @@ class NFLMockDraftScraper:
         title = title_elem.get_text(strip=True) if title_elem else "NFL Mock Draft"
         
         # Extract author
-        author_elem = soup.find('span', class_='nfl-c-author__name') or \
+        author_elem = soup.select_one('.nfl-o-author__name') or \
+                     soup.find('span', class_='nfl-c-author__name') or \
                      soup.find('div', class_='author') or \
                      soup.find('a', href=re.compile(r'/author/'))
         
         author = "Unknown"
         if author_elem:
-            author = author_elem.get_text(strip=True)
+            # The author link also holds the role ("NFL.com Analyst"); keep the name only
+            author = next(author_elem.stripped_strings, "Unknown")
         
         # Extract date
         date_elem = soup.find('time') or soup.find('span', class_='date')
@@ -108,9 +110,68 @@ class NFLMockDraftScraper:
         
         return [mock_draft]
     
+    def extract_pick_card_picks(self, soup):
+        """Read picks from NFL.com's current pick cards (live layout, 2026).
+
+        Each card has a `role="group"` box labelled "Pick N", a link to the
+        team (/teams/...) and a link to the prospect (/prospects/...) whose
+        text reads name, school, then "QB · Senior".
+        """
+        picks = []
+        for group in soup.find_all(attrs={'role': 'group', 'aria-label': re.compile(r'^Pick \d+$')}):
+            card = group.parent
+            team_link = card.find('a', href=re.compile(r'^(https://www\.nfl\.com)?/teams/'))
+            player_link = card.find('a', href=re.compile(r'^(https://www\.nfl\.com)?/prospects/'))
+            if not (team_link and player_link):
+                continue
+            texts = list(player_link.stripped_strings)
+            details = [part.strip() for part in ' '.join(texts[2:]).split('·') if part.strip()]
+            picks.append({
+                'pick': int(group['aria-label'].split()[1]),
+                'team': team_link.get_text(' ', strip=True),
+                'player': texts[0] if texts else '',
+                'position': details[0] if details else '',
+                'school': texts[1] if len(texts) > 1 else ''
+            })
+        return picks
+
+    def extract_ranked_item_picks(self, soup):
+        """Read picks from NFL.com's ranked-item blocks (layout saved in ref/, June 2025).
+
+        Each pick is a `.nfl-o-ranked-item`: the label holds the pick number,
+        the first media object the team, and the `nfl-is-ranked-player` media
+        object the player with an info line like "Miami · QB · Senior".
+        """
+        picks = self.extract_pick_card_picks(soup)
+        if picks:
+            return picks
+        for item in soup.select('.nfl-o-ranked-item'):
+            number_elem = item.select_one('.nfl-o-ranked-item__label--second')
+            team_elem = item.select_one('.nfl-o-ranked-item__media-object:not(.nfl-is-ranked-player) .nfl-o-ranked-item__title')
+            player_box = item.select_one('.nfl-o-ranked-item__media-object.nfl-is-ranked-player')
+            if not (number_elem and team_elem and player_box):
+                continue
+            try:
+                pick_num = int(number_elem.get_text(strip=True))
+            except ValueError:
+                continue
+            player_elem = player_box.select_one('.nfl-o-ranked-item__title')
+            info_elem = player_box.select_one('.nfl-o-ranked-item__info')
+            info = [part.strip() for part in info_elem.get_text(' ', strip=True).split('·')] if info_elem else []
+            picks.append({
+                'pick': pick_num,
+                'team': team_elem.get_text(' ', strip=True),
+                'player': player_elem.get_text(' ', strip=True) if player_elem else '',
+                'position': info[1] if len(info) > 1 else '',
+                'school': info[0] if info else ''
+            })
+        return picks
+
     def extract_draft_picks(self, soup):
         """Extract individual draft picks from the page"""
-        picks = []
+        picks = self.extract_ranked_item_picks(soup)
+        if picks:
+            return picks[:32]
         
         # Look for various patterns of draft pick information
         pick_patterns = [
@@ -180,7 +241,11 @@ class NFLMockDraftScraper:
                ('2025' in href and 'mock' in href and 'draft' in href):
                 
                 full_url = urljoin(self.base_url, href)
-                mock_draft_urls.add(full_url)
+                # Skip share buttons (Facebook, X, mailto) that carry the article URL
+                parsed = urlparse(full_url)
+                if parsed.netloc != 'www.nfl.com' or not parsed.path.startswith('/news/'):
+                    continue
+                mock_draft_urls.add(full_url.split('?')[0].split('#')[0])
         
         return list(mock_draft_urls)
     
